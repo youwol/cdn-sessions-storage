@@ -11,12 +11,12 @@ spec:
       { { - include "chart.selectorLabels" . | nindent 6 } }
   template:
     metadata:
-      labels:
-        { { - include "chart.selectorLabels" . | nindent 8 } }
       annotations:
       { { - if .Values.forceRestart } }
       releaseTime: { { dateInZone "2006-01-02 15:04:05Z" (now) "UTC"| quote } }
       { { - end } }
+      labels:
+        { { - include "chart.selectorLabels" . | nindent 8 } }
     spec:
     { { - with .Values.imagePullSecrets } }
     imagePullSecrets:
@@ -41,15 +41,7 @@ spec:
             port: http
           initialDelaySeconds: 15
           periodSeconds: 15
-          timeoutSeconds: 2
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: http
-          initialDelaySeconds: 15
-          periodSeconds: 15
-          timeoutSeconds: 2
+          timeoutSeconds: 5
           failureThreshold: 3
         env:
           - name: AUTH_CLIENT_ID

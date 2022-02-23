@@ -7,8 +7,9 @@ metadata:
   namespace: { { $.Release.Namespace } }
 spec:
   host: { { $value } }
-  prefix: /api/flux-backend/
+  prefix: /api/cdn-backend/
   service: '{{ template "chart.fullname" $ }}:80'
+  timeout_ms: 300000
 ---
 { { - end } }
   { { - end } }
@@ -35,8 +36,8 @@ proxy:
   path: /
   connect_timeout: 60000
   retries: 10
-  read_timeout: 10000
-  write_timeout: 10000
+  read_timeout: 300000
+  write_timeout: 300000
 route:
   regex_priority: 0
   strip_path: true
