@@ -1,14 +1,17 @@
 import os
 
-from config_common import on_before_startup
-from youwol_cdn_sessions_storage import Configuration, Constants
-from youwol_utils import StorageClient, RedisCacheClient, get_authorization_header
-from youwol_utils.clients.oidc.oidc_config import OidcInfos
-from youwol_utils.clients.oidc.oidc_config import PrivateClient
-from youwol_utils.context import DeployedContextReporter
-from youwol_utils.middlewares import AuthMiddleware, JwtProviderCookie
-from youwol_utils.servers.env import REDIS, OPENID_CLIENT, Env
-from youwol_utils.servers.fast_api import FastApiMiddleware, ServerOptions, AppConfiguration
+from youwol.backends.cdn_sessions_storage import Configuration, Constants
+from youwol.utils import StorageClient, RedisCacheClient
+from youwol.utils.clients.oidc.oidc_config import OidcInfos
+from youwol.utils.clients.oidc.oidc_config import PrivateClient
+from youwol.utils.context import DeployedContextReporter
+from youwol.utils.middlewares import AuthMiddleware, JwtProviderCookie
+from youwol.utils.servers.env import REDIS, OPENID_CLIENT, Env
+from youwol.utils.servers.fast_api import (
+    FastApiMiddleware,
+    ServerOptions,
+    AppConfiguration,
+)
 
 
 async def get_configuration():
@@ -21,43 +24,37 @@ async def get_configuration():
     openid_base_url = os.getenv(Env.OPENID_BASE_URL)
     openid_client_id = os.getenv(Env.OPENID_CLIENT_ID)
     openid_client_secret = os.getenv(Env.OPENID_CLIENT_SECRET)
-    oidc_client = PrivateClient(client_id=openid_client_id, client_secret=openid_client_secret)
+    oidc_client = PrivateClient(
+        client_id=openid_client_id, client_secret=openid_client_secret
+    )
     openid_infos = OidcInfos(base_uri=openid_base_url, client=oidc_client)
 
     redis_host = os.getenv(Env.REDIS_HOST)
-    jwt_cache = RedisCacheClient(host=redis_host, prefix='jwt_cache')
-
-    async def _on_before_startup():
-        await on_before_startup(service_config)
+    auth_cache = RedisCacheClient(host=redis_host, prefix="auth_cache")
 
     service_config = Configuration(
         storage=StorageClient(
-            url_base="http://storage/api",
-            bucket_name=Constants.namespace
+            url_base="http://storage/api", bucket_name=Constants.namespace
         ),
-        admin_headers=await get_authorization_header(openid_infos)
     )
     server_options = ServerOptions(
-        root_path='/api/cdn-sessions-storage',
+        root_path="/api/cdn-sessions-storage",
         http_port=8080,
         base_path="",
         middlewares=[
             FastApiMiddleware(
-                AuthMiddleware, {
-                    'openid_infos': openid_infos,
-                    'predicate_public_path': lambda url:
-                    url.path.endswith("/healthz"),
-                    'jwt_providers': [JwtProviderCookie(
-                        jwt_cache=jwt_cache,
-                        openid_infos=openid_infos
-                    )],
-                }
+                AuthMiddleware,
+                {
+                    "openid_base_uri": openid_base_url,
+                    "predicate_public_path": lambda url: url.path.endswith("/healthz"),
+                    "jwt_providers": [
+                        JwtProviderCookie(
+                            auth_cache=auth_cache, openid_infos=openid_infos
+                        )
+                    ],
+                },
             )
         ],
-        on_before_startup=_on_before_startup,
-        ctx_logger=DeployedContextReporter()
+        ctx_logger=DeployedContextReporter(),
     )
-    return AppConfiguration(
-        server=server_options,
-        service=service_config
-    )
+    return AppConfiguration(server=server_options, service=service_config)
